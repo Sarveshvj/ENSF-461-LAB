@@ -19,6 +19,19 @@ static void wait_for(pid_t pid)
     }
 }
 
+
+
+
+static void close_fd(int fd)
+{
+    if (close(fd) < 0) {
+        perror("close");
+    }
+}
+
+
+
+
 static int prepare_command(const char* text, char** argv, char* path, size_t pathlen)
 {
     int argc = tokenize(text, argv, MAXARGS);
@@ -87,15 +100,16 @@ static void run_pipeline(const char* line, int pipeidx)
     pid_t pid1 = fork();
     if (pid1 < 0) {
         perror("fork");
-        close(fd[0]); close(fd[1]);
+        close_fd(fd[0]);
+        close_fd(fd[1]);
         goto done;
     }
     if (pid1 == 0) {
         if (dup2(fd[1], STDOUT_FILENO) < 0) {
             perror("dup2"); _exit(1);
         }
-        close(fd[0]);
-        close(fd[1]);
+        close_fd(fd[0]);
+        close_fd(fd[1]);
         execve(path1, argv1, environ);
         perror("execve");
         _exit(127);
@@ -104,7 +118,8 @@ static void run_pipeline(const char* line, int pipeidx)
     pid_t pid2 = fork();
     if (pid2 < 0) {
         perror("fork");
-        close(fd[0]); close(fd[1]);
+        close_fd(fd[0]);
+        close_fd(fd[1]);
         wait_for(pid1);
         goto done;
     }
@@ -112,15 +127,15 @@ static void run_pipeline(const char* line, int pipeidx)
         if (dup2(fd[0], STDIN_FILENO) < 0) {
             perror("dup2"); _exit(1);
         }
-        close(fd[0]);
-        close(fd[1]);
+        close_fd(fd[0]);
+        close_fd(fd[1]);
         execve(path2, argv2, environ);
         perror("execve");
         _exit(127);
     }
+    close_fd(fd[0]);
+    close_fd(fd[1]);
 
-    close(fd[0]);
-    close(fd[1]);
     wait_for(pid1);
     wait_for(pid2);
 
