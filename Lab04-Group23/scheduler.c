@@ -149,6 +149,8 @@ void policy_SJF()
         }
 
         printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", current_time, shortest->id, shortest->arrival, shortest->length);
+        shortest->jobStart = current_time;
+        shortest->completedJob = current_time + shortest->length;
         current_time += shortest->length;
 
         if (beforeShortest == NULL)
@@ -216,6 +218,35 @@ void policy_FIFO()
     printf("End of execution with FIFO.\n");
 }
 
+void analyze_jobs(Job **jobs, const char *name)
+{
+    printf("Begin analyzing %s:\n", name);
+
+    double totalResponseTime = 0;
+    double totalTurnaround = 0;
+    double totalWait = 0;
+
+    for (int i = 0; i < numofjobs; i++)
+    {
+        int responseTime = (jobs[i]->jobStart) - (jobs[i]->arrival);
+        int turnaround = (jobs[i]->completedJob) - (jobs[i]->arrival);
+        int wait = turnaround - (jobs[i]->length);
+
+        printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", jobs[i]->id, responseTime, turnaround, wait);
+
+        totalResponseTime += responseTime;
+        totalTurnaround += turnaround;
+        totalWait += wait;
+    }
+
+    printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n",
+           totalResponseTime / numofjobs,
+           totalTurnaround / numofjobs,
+           totalWait / numofjobs);
+
+    printf("End analyzing %s.\n", name);
+}
+
 int main(int argc, char **argv)
 {
 
@@ -247,6 +278,10 @@ int main(int argc, char **argv)
 
     read_job_config(tname);
 
+    Job **jobs = malloc(numofjobs * sizeof(Job *));
+    for (Job *job = head; job != NULL; job = job->next)
+        jobs[job->id] = job;
+
     if (strcmp(pname, "FIFO") == 0)
     {
         policy_FIFO();
@@ -261,7 +296,7 @@ int main(int argc, char **argv)
         policy_SJF();
         if (analysis == 1)
         {
-            // TODO ANALYSIS
+            analyze_jobs(jobs, "SJF");
         }
     }
     else if (strcmp(pname, "STCF") == 0)
