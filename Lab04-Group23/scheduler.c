@@ -156,9 +156,52 @@ void policy_STCF()
 void policy_RR(int slice)
 {
     printf("Execution trace with RR:\n");
-
+	
     // TODO: implement RR policy
-
+    int current_time = 0;
+    int finished = 0;
+    Job* last = NULL;    
+ 
+    while (finished < numofjobs){
+ 
+        Job* start = (last != NULL && last->next != NULL) ? last->next : head;
+ 
+        Job* pick = NULL;
+        Job* cur = start;
+        do {
+            if (cur->remaining > 0 && cur->arrival <= current_time){
+                pick = cur;
+                break;
+            }
+            cur = (cur->next != NULL) ? cur->next : head;
+        } while (cur != start);
+ 
+        if (pick == NULL){
+            int next = INT_MAX;
+            for (Job* j = head; j != NULL; j = j->next){
+                if (j->remaining > 0 && j->arrival < next)
+                    next = j->arrival;
+            }
+            current_time = next;
+            continue;
+        }
+ 
+        int ran = min(slice, pick->remaining);  
+ 
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n",
+                current_time, pick->id, pick->arrival, ran);
+ 
+        if (pick->jobStart == -1)
+            pick->jobStart = current_time;
+        pick->remaining -= ran;
+        current_time += ran;
+        if (pick->remaining == 0){
+            pick->completedJob = current_time;
+            finished++;
+        }
+        last = pick;
+    }
+ 
     printf("End of execution with RR.\n");
 }
 
@@ -166,21 +209,58 @@ void policy_RR(int slice)
 void policy_LT(int slice)
 {
     printf("Execution trace with LT:\n");
-
-    // Leave this here, it will ensure the scheduling behavior remains deterministic
+ 
     srand(42);
-
-    // In the following, you'll need to:
-    // Figure out which active job to run first
-    // Pick the job with the shortest remaining time
-    // Considers jobs in order of arrival, so implicitly breaks ties by choosing the job with the lowest ID
-
-    // To achieve consistency with the tests, you are encouraged to choose the winning ticket as follows:
-    // int winning_ticket = rand() % total_tickets;
-    // And pick the winning job using the linked list approach discussed in class, or equivalent
-
+ 
+    int current_time = 0;
+    int finished = 0;
+ 
+    while (finished < numofjobs){
+        int total_tickets = 0;
+        for (Job* j = head; j != NULL; j = j->next){
+            if (j->remaining > 0 && j->arrival <= current_time)
+                total_tickets += j->tickets;
+        }
+ 
+        if (total_tickets == 0){
+            int next = INT_MAX;
+            for (Job* j = head; j != NULL; j = j->next){
+                if (j->remaining > 0 && j->arrival < next)
+                    next = j->arrival;
+            }
+            current_time = next;
+            continue;
+        }
+ 
+        int winning_ticket = rand() % total_tickets;
+        int counter = 0;
+        Job* winner = NULL;
+        for (Job* j = head; j != NULL; j = j->next){
+            if (j->remaining > 0 && j->arrival <= current_time){
+                counter += j->tickets;
+                if (counter > winning_ticket){
+                    winner = j;
+                    break;
+                }
+            }
+        }
+ 
+        int ran = min(slice, winner->remaining);
+ 
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n",
+                current_time, winner->id, winner->arrival, ran);
+ 
+        if (winner->jobStart == -1)
+            winner->jobStart = current_time;
+        winner->remaining -= ran;
+        current_time += ran;
+        if (winner->remaining == 0){
+            winner->completedJob = current_time;
+            finished++;
+        }
+    }
+ 
     printf("End of execution with LT.\n");
-
 }
 
 
