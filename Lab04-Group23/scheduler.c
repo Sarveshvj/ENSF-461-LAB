@@ -331,11 +331,11 @@ int main(int argc, char **argv){
     }
     else if (strcmp(pname, "RR") == 0)
     {
-        // TODO
+        policy_RR(slice);
     }
     else if (strcmp(pname, "LT") == 0)
     {
-        // TODO
+        policy_LT(slice);
     }
 
 	exit(0);
