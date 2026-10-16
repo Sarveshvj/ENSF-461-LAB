@@ -168,6 +168,63 @@ void policy_STCF()
     printf("Execution trace with STCF:\n");
 
     // TODO: implement STCF policy
+    int current_time = 0;
+    int completed = 0;
+    int start = 0;
+    Job *running = NULL;
+
+    while (completed < numofjobs)
+    {
+
+        Job *shortest = NULL;
+        Job *temp = head;
+        while (temp != NULL)
+        {
+            if (temp->arrival <= current_time && temp->remaining > 0)
+            {
+                if (shortest == NULL || temp->remaining < shortest->remaining)
+                    shortest = temp;
+            }
+            temp = temp->next;
+        }
+
+        if (shortest != running)
+        {
+            if (running != NULL)
+            {
+                printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", start, running->id, running->arrival, current_time - start);
+            }
+            running = shortest;
+            start = current_time;
+            if (running != NULL && running->jobStart == -1)
+                running->jobStart = current_time;
+        }
+
+        if (running == NULL)
+        {
+            Job *next_job = head;
+            while (next_job != NULL)
+            {
+                if (next_job->remaining > 0 && next_job->arrival > current_time)
+                    break;
+                next_job = next_job->next;
+            }
+
+            if (next_job == NULL)
+                break;
+            current_time = next_job->arrival;
+            continue;
+        }
+        running->remaining--;
+        current_time++;
+        if (running->remaining == 0)
+        {
+            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", start, running->id, running->arrival, current_time - start);
+            running->completedJob = current_time;
+            completed++;
+            running = NULL;
+        }
+    }
 
     printf("End of execution with STCF.\n");
 }
@@ -399,7 +456,12 @@ int main(int argc, char **argv)
     }
     else if (strcmp(pname, "STCF") == 0)
     {
-        // TODO
+        policy_STCF();
+
+        if (analysis == 1)
+        {
+            analyze_jobs(jobs, "STCF");
+        }
     }
     else if (strcmp(pname, "RR") == 0)
     {
