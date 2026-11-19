@@ -321,6 +321,41 @@ int main(int argc, char* argv[]) {
                         stop = TRUE;
                 }
             }
+            else if (strcmp(tokens[0], "pinspect") == 0)
+            {
+                uint32_t vpn = (uint32_t)strtoul(tokens[1], NULL, 10);
+
+                fprintf(output_file, "Current PID: %d. Inspected page table entry %u. Physical frame number: %u. Valid: %d\n", current_pid, vpn, page_tables[current_pid][vpn].pfn, page_tables[current_pid][vpn].valid);
+            }
+            else if (strcmp(tokens[0], "tinspect") == 0)
+            {
+                int n = atoi(tokens[1]);
+
+                fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %u. PFN: %u. Valid: %d. PID: %d. Timestamp: %u\n", current_pid, n, tlb[n].vpn, tlb[n].pfn, tlb[n].valid, tlb[n].pid, tlb[n].timestamp);
+            }
+            else if (strcmp(tokens[0], "linspect") == 0)
+            {
+                uint32_t location = (uint32_t)strtoul(tokens[1], NULL, 10);
+
+                fprintf(output_file, "Current PID: %d. Inspected physical location %u. Value: %u\n", current_pid, location, physical_memory[location]);
+            }
+            else if (strcmp(tokens[0], "rinspect") == 0)
+            {
+                int reg = -1;
+
+                if (strcmp(tokens[1], "r1") == 0)
+                    reg = 0;
+                else if (strcmp(tokens[1], "r2") == 0)
+                    reg = 1;
+
+                if (reg == -1)
+                {
+                    fprintf(output_file, "Current PID: %d. Error: invalid register operand %s\n", current_pid, tokens[1]);
+                    stop = TRUE;
+                }
+                else
+                    fprintf(output_file, "Current PID: %d. Inspected register %s. Content: %u\n", current_pid, tokens[1], registers[current_pid][reg]);
+            }
         }
 
         // Deallocate tokens
