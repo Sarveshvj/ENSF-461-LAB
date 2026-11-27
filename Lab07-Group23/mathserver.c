@@ -1,10 +1,32 @@
+#define _POSIX_C_SOURCE 200809L // for open_memstream
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <string.h>
 
 #define NUM_CONTEXTS 16
+#define BATCH_SIZE 10
+
+typedef struct {
+    char op[4];
+    int arg;
+} Operation;
+
+// One queue of operations per context
+typedef struct {
+    int ctx;
+    Operation *ops;
+    size_t count;
+    size_t capacity;
+    FILE *log;
+} Context;
+
+static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void execute(FILE *log, const char *op, int ctx, int arg, int *value);
+static void enqueue(Context *context, const char *op, int arg);
+static void *run_context(void *data);
 
 int main(int argc, char *argv[]) {
     // Parse command line arguments
@@ -27,7 +49,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int values[NUM_CONTEXTS] = {0};
+    Context contexts[NUM_CONTEXTS] = {0};
     char line[1024];
 
     // Read input file line by line
@@ -45,12 +67,87 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        execute(log, op, ctx, arg, &values[ctx]);
+        enqueue(&contexts[ctx], op, arg);
+    }
+
+    // Run each context's queue in its own thread
+    pthread_t threads[NUM_CONTEXTS];
+    for (int i = 0; i < NUM_CONTEXTS; i++) {
+        contexts[i].ctx = i;
+        contexts[i].log = log;
+        if (pthread_create(&threads[i], NULL, run_context, &contexts[i]) != 0) {
+            fprintf(stderr, "pthread_create failed\n");
+            exit(1);
+        }
+    }
+
+    // Wait for all threads before closing the log
+    for (int i = 0; i < NUM_CONTEXTS; i++) {
+        pthread_join(threads[i], NULL);
+        free(contexts[i].ops);
     }
 
     fclose(input);
     fclose(log);
     return 0;
+}
+
+// Add an operation to the end of a context's queue
+static void enqueue(Context *context, const char *op, int arg) {
+    if (context->count == context->capacity) {
+        size_t capacity = context->capacity == 0 ? 16 : context->capacity * 2;
+        Operation *ops = realloc(context->ops, capacity * sizeof(*ops));
+        if (ops == NULL) {
+            perror("realloc");
+            exit(1);
+        }
+        context->ops = ops;
+        context->capacity = capacity;
+    }
+
+    Operation *next = &context->ops[context->count++];
+    strcpy(next->op, op);
+    next->arg = arg;
+}
+
+// Thread function: execute one context's operations in order
+static void *run_context(void *data) {
+    Context *context = data;
+    int value = 0;
+    char *batch = NULL;
+    size_t batch_length = 0;
+    FILE *buffer = NULL;
+
+    for (size_t i = 0; i < context->count; i++) {
+        // Start a new batch of log lines in memory
+        if (buffer == NULL) {
+            buffer = open_memstream(&batch, &batch_length);
+            if (buffer == NULL) {
+                perror("open_memstream");
+                exit(1);
+            }
+        }
+
+        execute(buffer, context->ops[i].op, context->ctx,
+                context->ops[i].arg, &value);
+
+        // Write after every 10 operations, and when the queue ends
+        if ((i + 1) % BATCH_SIZE == 0 || i + 1 == context->count) {
+            if (fclose(buffer) != 0) {
+                perror("fclose");
+                exit(1);
+            }
+            buffer = NULL;
+
+            pthread_mutex_lock(&log_mutex);
+            fwrite(batch, 1, batch_length, context->log);
+            pthread_mutex_unlock(&log_mutex);
+
+            free(batch);
+        }
+    }
+
+    return NULL;
 }
 
 static int fibonacci(int i){
