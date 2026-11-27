@@ -70,7 +70,6 @@ int main(int argc, char *argv[]) {
         enqueue(&contexts[ctx], op, arg);
     }
 
-    // Run each context's queue in its own thread
     pthread_t threads[NUM_CONTEXTS];
     for (int i = 0; i < NUM_CONTEXTS; i++) {
         contexts[i].ctx = i;
@@ -81,7 +80,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Wait for all threads before closing the log
     for (int i = 0; i < NUM_CONTEXTS; i++) {
         pthread_join(threads[i], NULL);
         free(contexts[i].ops);
@@ -92,7 +90,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-// Add an operation to the end of a context's queue
 static void enqueue(Context *context, const char *op, int arg) {
     if (context->count == context->capacity) {
         size_t capacity = context->capacity == 0 ? 16 : context->capacity * 2;
@@ -110,7 +107,6 @@ static void enqueue(Context *context, const char *op, int arg) {
     next->arg = arg;
 }
 
-// Thread function: execute one context's operations in order
 static void *run_context(void *data) {
     Context *context = data;
     int value = 0;
